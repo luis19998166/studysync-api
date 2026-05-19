@@ -1,13 +1,13 @@
 {
-  "name": "repos",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+"name": "studysync-api",
+"version": "1.0.0",
+"description": "Sistema de coordinación de grupos de estudio",
+"main": "src/server.js",
+"scripts": {
+"start": "node src/server.js",
+"dev": "nodemon src/server.js"
+},
+"engines": {
+"node": ">=20.0.0"
+}
 }
