@@ -4,7 +4,9 @@
   
   let sesiones = [];     // Base de datos temporal en memoria
   let nextId   = 1;      // Contador autoincrementable de IDs
-  
+
+  const { pub } = require('../redis/client');
+
   // ── GET /api/sesiones ─────────────────────────────────────────────────────────
   // Devuelve todas las sesiones disponibles
   const listar = async (req, res) => {
@@ -55,7 +57,7 @@
     };
   
     sesiones.push(nuevaSesion);
-  
+     
     // 201 = Created: se creó un nuevo recurso exitosamente
     res.status(201).json(nuevaSesion);
   };
