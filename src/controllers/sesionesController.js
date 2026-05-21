@@ -57,8 +57,19 @@
     };
   
     sesiones.push(nuevaSesion);
-     
-    // 201 = Created: se creó un nuevo recurso exitosamente
+
+    // Publicar evento en Redis → el suscriptor lo retransmite via Socket.io
+    try {
+      await pub.publish('study:sesion:creada', JSON.stringify({
+        tipo: 'sesion:creada',
+        payload: nuevaSesion,
+        timestamp: new Date().toISOString(),
+      }));
+      console.log('[Redis] Evento publicado: sesion:creada →', nuevaSesion.titulo);
+    } catch (e) {
+      console.error('[Redis] No se pudo publicar el evento:', e.message);
+    }
+
     res.status(201).json(nuevaSesion);
   };
   
