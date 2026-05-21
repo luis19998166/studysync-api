@@ -3,7 +3,7 @@
   // - pub: para publicar mensajes (no puede suscribirse mientras publica)
   // - sub: para suscribirse a canales (no puede publicar mientras escucha)
   // Esta separación es OBLIGATORIA en Redis Pub/Sub
-  require('dotenv').config();
+require('dotenv').config({ quiet: true });
   const Redis = require('ioredis');
   
   const REDIS_URL = process.env.REDIS_URL;

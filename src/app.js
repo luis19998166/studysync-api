@@ -1,12 +1,39 @@
 // src/app.js
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const express    = require('express');
+const helmet     = require('helmet');
 const cors       = require('cors');
 const rateLimit  = require('express-rate-limit');
 const swaggerUi  = require('swagger-ui-express');
 const swaggerSpec = require('./swagger/config');
 
 const app = express();
+
+// ── HELMET — Cabeceras de seguridad HTTP ──────────────────────────────────────
+// Helmet configura automáticamente ~12 headers que el navegador interpreta
+// como instrucciones de seguridad. Debe ir PRIMERO, antes de cualquier otro middleware.
+//
+// Headers que activa:
+//   Content-Security-Policy    → bloquea scripts/recursos de dominios no autorizados
+//   X-Frame-Options: DENY      → impide que la app sea embebida en un <iframe> (clickjacking)
+//   X-Content-Type-Options     → prohíbe al navegador "adivinar" el tipo MIME (MIME sniffing)
+//   Strict-Transport-Security  → fuerza HTTPS en el navegador (HSTS)
+//   Referrer-Policy            → controla qué URL se envía como "Referer" en requests
+//   X-XSS-Protection           → activa el filtro XSS del navegador (legacy, pero útil)
+//   Cross-Origin-*             → políticas de aislamiento de origen cruzado
+app.use(helmet({
+  // Relajamos CSP para que Swagger UI pueda cargar sus assets inline
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc:    ["'self'"],
+      scriptSrc:     ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc:      ["'self'", "'unsafe-inline'", 'https:'],
+      imgSrc:        ["'self'", 'data:', 'https:'],
+      connectSrc:    ["'self'"],
+      fontSrc:       ["'self'", 'https:', 'data:'],
+    },
+  },
+}));
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 app.use(cors());
@@ -36,9 +63,11 @@ app.use((req, res, next) => {
 // ── SWAGGER UI ────────────────────────────────────────────────────────────────
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customSiteTitle: 'StudySync API Docs',
+  swaggerOptions: { persistAuthorization: true },
 }));
 
 // ── RUTAS ─────────────────────────────────────────────────────────────────────
+app.use('/auth',         require('./routes/auth'));
 app.use('/api/sesiones', require('./routes/sesiones'));
 
 app.get('/', (req, res) => {
