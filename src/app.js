@@ -22,14 +22,18 @@ const app = express();
 //   X-XSS-Protection           → activa el filtro XSS del navegador (legacy, pero útil)
 //   Cross-Origin-*             → políticas de aislamiento de origen cruzado
 app.use(helmet({
-  // Relajamos CSP para que Swagger UI pueda cargar sus assets inline
+  // Relajamos CSP para Swagger UI y el frontend con event handlers inline
   contentSecurityPolicy: {
     directives: {
       defaultSrc:    ["'self'"],
       scriptSrc:     ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      // Helmet 7 separa script-src (bloques <script>) de script-src-attr
+      // (atributos onclick, onkeydown, etc.). Sin esto, los botones del
+      // frontend quedan bloqueados aunque scriptSrc permita 'unsafe-inline'.
+      scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc:      ["'self'", "'unsafe-inline'", 'https:'],
       imgSrc:        ["'self'", 'data:', 'https:'],
-      connectSrc:    ["'self'"],
+      connectSrc:    ["'self'", 'wss:', 'ws:'],
       fontSrc:       ["'self'", 'https:', 'data:'],
     },
   },
