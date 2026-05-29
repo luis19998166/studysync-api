@@ -159,6 +159,90 @@ require('dotenv').config({ quiet: true });
 
 ---
 
+### BUG-004: Helmet bloquea botones onclick en el frontend (CSP script-src-attr)
+
+| Campo         | Valor                                                        |
+|---------------|--------------------------------------------------------------|
+| ID            | BUG-004                                                      |
+| Fecha         | 2026-05-29                                                   |
+| Reportado por | Jimmy Requena                                                |
+| Severidad     | Alto                                                         |
+| Estado        | Resuelto                                                     |
+| Componente    | `src/app.js` — configuración CSP de Helmet                   |
+| Versión       | commit `615fa4e`                                             |
+
+**Descripción:**
+Al hacer clic en "Iniciar sesión" o "Crear cuenta" en producción, la consola del navegador muestra el error CSP y la acción no se ejecuta.
+
+**Pasos para reproducir:**
+1. Abrir `/login.html` en producción
+2. Ingresar credenciales → clic en "Iniciar sesión"
+3. DevTools → Console → 2 errores rojos CSP
+
+**Resultado esperado:** Login ejecuta la función `login()` y redirige al panel.
+
+**Resultado obtenido:**
+```
+Executing inline event handler violates Content Security Policy directive
+'script-src-attr 'none''. The action has been blocked.
+```
+
+**Causa raíz:**
+Helmet 7 introdujo `script-src-attr` como directiva separada de `script-src`. El HTML usa `onclick="login()"` (inline event handlers en atributos HTML). Aunque `scriptSrc` incluía `'unsafe-inline'`, Helmet ponía `script-src-attr: 'none'` por defecto, bloqueando todos los atributos `on*`.
+
+**Corrección aplicada:**
+Agregar `scriptSrcAttr: ["'unsafe-inline'"]` a los directives de CSP en `app.js`:
+```js
+contentSecurityPolicy: {
+  directives: {
+    scriptSrc:     ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+    scriptSrcAttr: ["'unsafe-inline'"],  // ← esta línea faltaba
+    ...
+  }
+}
+```
+
+---
+
+### BUG-005: Error 42P05 "prepared statement s0 already exists" en Supabase
+
+| Campo         | Valor                                                        |
+|---------------|--------------------------------------------------------------|
+| ID            | BUG-005                                                      |
+| Fecha         | 2026-05-29                                                   |
+| Reportado por | Jimmy Requena                                                |
+| Severidad     | Crítico                                                      |
+| Estado        | Resuelto                                                     |
+| Componente    | `DATABASE_URL` — configuración del pooler de Supabase        |
+| Versión       | commit `615fa4e`                                             |
+
+**Descripción:**
+Al hacer login en producción, la app devuelve el error de Prisma con código PostgreSQL 42P05.
+
+**Pasos para reproducir:**
+1. Deploy nuevo en Render con DATABASE_URL apuntando al pooler de Supabase (puerto 6543)
+2. Hacer POST /auth/login en producción
+3. La respuesta es 500 con el error de Prisma
+
+**Resultado esperado:** Login exitoso, 200 OK con JWT.
+
+**Resultado obtenido:**
+```json
+{ "error": "Invalid prisma.usuario.findUnique() invocation:
+  PostgresError { code: '42P05', message: 'prepared statement s0 already exists' }" }
+```
+
+**Causa raíz:**
+El pooler de Supabase en puerto 6543 usa PgBouncer en modo "transaction". PgBouncer reutiliza conexiones entre clientes, por lo que las "prepared statements" que Prisma crea en una conexión persisten y colisionan cuando el servidor se reinicia e intenta crearlas de nuevo.
+
+**Corrección aplicada:**
+Agregar `?pgbouncer=true&connection_limit=1` al `DATABASE_URL`. Esto le indica a Prisma que deshabilite las prepared statements cuando usa pgBouncer:
+```env
+DATABASE_URL=postgresql://...supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+```
+
+---
+
 ## Historial de cambios
 
 | Fecha      | Acción                          | Por            |
@@ -166,3 +250,5 @@ require('dotenv').config({ quiet: true });
 | 2026-05-15 | BUG-001 detectado y cerrado     | Jimmy Requena  |
 | 2026-05-18 | BUG-002 detectado y cerrado     | Jimmy Requena  |
 | 2026-05-21 | BUG-003 detectado y cerrado     | Jimmy Requena  |
+| 2026-05-29 | BUG-004 detectado y cerrado     | Jimmy Requena  |
+| 2026-05-29 | BUG-005 detectado y cerrado     | Jimmy Requena  |
