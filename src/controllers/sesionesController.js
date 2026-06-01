@@ -1,85 +1,110 @@
 // src/controllers/sesionesController.js
-// Contiene la lógica de negocio para las sesiones de estudio
-// Por ahora usa un arreglo en memoria — el Paso 11 lo migra a Supabase
-let sesiones = []; // Base de datos temporal en memoria
-let nextId = 1; // Contador autoincrementable de IDs
-// ── GET /api/sesiones
+// Lógica de negocio para sesiones — migrado a Supabase via Prisma (Paso 10)
 
-// Devuelve todas las sesiones disponibles
+const prisma = require('../db');
+const { pub } = require('../redis/client');
+
+// ── GET /api/sesiones ─────────────────────────────────────────────────────────
 const listar = async (req, res) => {
-res.json({
-ok: true,
-total: sesiones.length,
-datos: sesiones
-});
-};
-// ── GET /api/sesiones/:id
+  const sesiones = await prisma.sesion.findMany({
+    orderBy: { creadaEn: 'desc' },
+    include: { autor: { select: { id: true, nombre: true, email: true } } }
+  });
 
-// Devuelve UNA sesión buscando por su ID
+  res.json({ ok: true, total: sesiones.length, datos: sesiones });
+};
+
+// ── GET /api/sesiones/:id ─────────────────────────────────────────────────────
 const obtenerUna = async (req, res) => {
-const id = parseInt(req.params.id); // Convertir string a número
-const sesion = sesiones.find(s => s.id === id);
-if (!sesion) {
-// 404 = Not Found: el recurso no existe
-return res.status(404).json({ error: `Sesión ${id} no encontrada` });
-}
-res.json(sesion);
-};
-// ── POST /api/sesiones
+  const id = parseInt(req.params.id);
 
-// Crea una nueva sesión con los datos del body
+  const sesion = await prisma.sesion.findUnique({
+    where: { id },
+    include: { autor: { select: { id: true, nombre: true, email: true } } }
+  });
+
+  if (!sesion) {
+    return res.status(404).json({ error: `Sesión ${id} no encontrada` });
+  }
+
+  res.json(sesion);
+};
+
+// ── POST /api/sesiones ────────────────────────────────────────────────────────
 const crear = async (req, res) => {
-const { titulo, descripcion, fechaHora, materia } = req.body;
-// Validación: título es obligatorio
-if (!titulo || titulo.trim() === '') {
-// 400 = Bad Request: el cliente envió datos incorrectos
-return res.status(400).json({
-error: 'El campo titulo es obligatorio',
-campos_requeridos: ['titulo'],
-campos_opcionales: ['descripcion', 'fechaHora', 'materia']
-});
-}
-const nuevaSesion = {
-id: nextId++,
-titulo: titulo.trim(),
-descripcion: descripcion || '',
-materia: materia || 'General',
-fechaHora: fechaHora || new Date().toISOString(),
-completada: false,
-creadaEn: new Date().toISOString()
-};
-sesiones.push(nuevaSesion);
-// 201 = Created: se creó un nuevo recurso exitosamente
-res.status(201).json(nuevaSesion);
-};
-// ── PUT /api/sesiones/:id
+  const { titulo, descripcion, fechaHora, materia } = req.body;
 
-// Actualiza una sesión existente (reemplaza todos sus campos)
+  if (!titulo || titulo.trim() === '') {
+    return res.status(400).json({
+      error: 'El campo titulo es obligatorio',
+      campos_requeridos: ['titulo'],
+      campos_opcionales: ['descripcion', 'fechaHora', 'materia']
+    });
+  }
+
+  const nuevaSesion = await prisma.sesion.create({
+    data: {
+      titulo: titulo.trim(),
+      descripcion: descripcion || '',
+      materia: materia || 'General',
+      fechaHora: fechaHora ? new Date(fechaHora) : new Date(),
+      autorId: req.usuario.id, // Inyectado por el middleware autenticar
+    },
+    include: { autor: { select: { id: true, nombre: true, email: true } } }
+  });
+
+  // Publicar evento en Redis → el suscriptor lo retransmite via Socket.io
+  try {
+    await pub.publish('study:sesion:creada', JSON.stringify({
+      tipo: 'sesion:creada',
+      payload: nuevaSesion,
+      timestamp: new Date().toISOString(),
+    }));
+  } catch (e) {
+    console.error('[Redis] No se pudo publicar el evento:', e.message);
+  }
+
+  res.status(201).json(nuevaSesion);
+};
+
+// ── PUT /api/sesiones/:id ─────────────────────────────────────────────────────
 const actualizar = async (req, res) => {
-const id = parseInt(req.params.id);
-const indice = sesiones.findIndex(s => s.id === id);
-if (indice === -1) {
-return res.status(404).json({ error: `Sesión ${id} no encontrada` });
-}
-// Conservar el id original y la fecha de creación, actualizar el resto
-sesiones[indice] = {
-...sesiones[indice], // Campos originales
-...req.body, // Nuevos valores del body
-id: id, // El ID nunca cambia
-actualizadaEn: new Date().toISOString()
-};
-res.json(sesiones[indice]);
-};
-// ── DELETE /api/sesiones/:id
+  const id = parseInt(req.params.id);
 
-// Elimina una sesión del arreglo
-const eliminar = async (req, res) => {
-const id = parseInt(req.params.id);
-const longitudAnterior = sesiones.length;
-sesiones = sesiones.filter(s => s.id !== id);
-if (sesiones.length === longitudAnterior) {
-return res.status(404).json({ error: `Sesión ${id} no encontrada` });
-}
-res.json({ ok: true, mensaje: `Sesión ${id} eliminada correctamente` });
+  const existe = await prisma.sesion.findUnique({ where: { id } });
+  if (!existe) {
+    return res.status(404).json({ error: `Sesión ${id} no encontrada` });
+  }
+
+  const { titulo, descripcion, materia, fechaHora, completada } = req.body;
+
+  const actualizada = await prisma.sesion.update({
+    where: { id },
+    data: {
+      ...(titulo      !== undefined && { titulo }),
+      ...(descripcion !== undefined && { descripcion }),
+      ...(materia     !== undefined && { materia }),
+      ...(fechaHora   !== undefined && { fechaHora: new Date(fechaHora) }),
+      ...(completada  !== undefined && { completada }),
+    },
+    include: { autor: { select: { id: true, nombre: true, email: true } } }
+  });
+
+  res.json(actualizada);
 };
+
+// ── DELETE /api/sesiones/:id ──────────────────────────────────────────────────
+const eliminar = async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  const existe = await prisma.sesion.findUnique({ where: { id } });
+  if (!existe) {
+    return res.status(404).json({ error: `Sesión ${id} no encontrada` });
+  }
+
+  await prisma.sesion.delete({ where: { id } });
+
+  res.json({ ok: true, mensaje: `Sesión ${id} eliminada correctamente` });
+};
+
 module.exports = { listar, obtenerUna, crear, actualizar, eliminar };
