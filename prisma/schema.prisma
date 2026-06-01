@@ -6,7 +6,7 @@ provider = "prisma-client-js"
 }
 datasource db {
 provider = "postgresql"
-// url = env("DATABASE_URL") // Lee el .env
+url = env("DATABASE_URL") // Lee el .env
 }
 // Modelo Usuario: representa la tabla 'usuarios' en la BD
 model Usuario {
