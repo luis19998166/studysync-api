@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Sistema de almacenamiento con S3 y registro de accesos'
+Parameters:
+ Ambiente:
+ Type: String
+ Default: desarrollo
+ AllowedValues: [desarrollo, staging, produccion]
+ Description: 'Ambiente de despliegue'
+Resources:
+ BucketPrincipal:
+ Type: AWS::S3::Bucket
+ Properties:
+ BucketName: 'datos-${Ambiente}'
+ VersioningConfiguration:
+ Status: Enabled
+ BucketLogs:
+ Type: AWS::S3::Bucket
+ Properties:
+ BucketName: 'logs-${Ambiente}'
+Outputs:
+ BucketPrincipalNombre:
+ Value: BucketPrincipal
+ Description: 'Bucket principal de datos'
+ BucketLogsNombre:
+ Value: BucketLogs
+ Description: 'Bucket de logs'
