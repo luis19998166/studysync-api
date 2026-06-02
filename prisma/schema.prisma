@@ -1,43 +1,71 @@
 // prisma/schema.prisma
-// Define la estructura de la base de datos — Prisma genera el cliente TypeSafe a partir de esto
-
+// Define los modelos de datos de StudySync.
+// Prisma los convierte automáticamente a tablas SQL en PostgreSQL.
+// ─────────────────────────────────────────
+// Generador de cliente
+// ─────────────────────────────────────────
 generator client {
-  provider = "prisma-client-js"
+ // provider: qué cliente generar (el de JavaScript/Node.js)
+ provider = "prisma-client-js"
 }
-
+// ─────────────────────────────────────────
+// Fuente de datos (conexión a BD)
+// ─────────────────────────────────────────
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  // directUrl permite conexiones directas (sin pooler) para migraciones
-  directUrl = env("DIRECT_URL")
+ // provider: tipo de base de datos
+ provider = "postgresql"
+ // url: se lee desde .env (Transaction Pooler, puerto 6543)
+ url = env("DATABASE_URL")
+ // directUrl: usada por prisma db push/migrate (Session Mode, puerto 5432)
+ directUrl = env("DIRECT_URL")
 }
-
-// ── Tabla de usuarios ─────────────────────────────────────────────────────────
+// ─────────────────────────────────────────
+// Modelo: Usuario
+// Se mapea a la tabla 'usuarios' en PostgreSQL
+// ─────────────────────────────────────────
 model Usuario {
-  id         Int       @id @default(autoincrement())
-  nombre     String
-  email      String    @unique
-  password   String    // Hash bcrypt — nunca el texto plano
-  creadoEn   DateTime  @default(now()) @map("creado_en")
-  sesiones   Sesion[]  // Relación: un usuario puede tener muchas sesiones
-
-  @@map("usuarios") // Nombre real de la tabla en PostgreSQL
-}
-
-// ── Tabla de sesiones de estudio ──────────────────────────────────────────────
+ // @id → Clave primaria de la tabla
+ // @default(autoincrement()) → Valor generado automáticamente (1, 2, 3...)
+ id Int @id @default(autoincrement())
+ // @unique → Crea un índice único; no puede haber dos usuarios con el mismo email
+ email String @unique
+ nombre String
+ // La contraseña se guarda hasheada con bcrypt (nunca en texto plano)
+ password String
+ // @default(now()) → Se asigna automáticamente al crear el registro
+ creadoEn DateTime @default(now()) @map("creado_en")
+ // ^─────────────────
+ // @map cambia el nombre de la columna en SQL
+ // (creadoEn en JS ↔ creado_en en PostgreSQL)
+ // Relación: un usuario puede tener múltiples sesiones
+ // 'sesiones' NO es una columna real; es una referencia virtual para Prisma
+ sesiones Sesion[]
+ // @@map → Nombre real de la tabla en PostgreSQL (convención: snake_case)
+ @@map("usuarios")
+ }
+// ─────────────────────────────────────────
+// Modelo: Sesion
+// Se mapea a la tabla 'sesiones' en PostgreSQL
+// ─────────────────────────────────────────
 model Sesion {
-  id           Int       @id @default(autoincrement())
-  titulo       String
-  descripcion  String    @default("")
-  materia      String    @default("General")
-  fechaHora    DateTime  @default(now()) @map("fecha_hora")
-  completada   Boolean   @default(false)
-  creadaEn     DateTime  @default(now()) @map("creada_en")
-  actualizadaEn DateTime? @updatedAt @map("actualizada_en")
-
-  // Clave foránea — cada sesión pertenece a un usuario
-  autorId      Int       @map("autor_id")
-  autor        Usuario   @relation(fields: [autorId], references: [id])
-
-  @@map("sesiones")
+ id Int @id @default(autoincrement())
+ titulo String
+ materia String
+ // fechaHora: cuándo se realizará la sesión de estudio
+ fechaHora DateTime @map("fecha_hora")
+ // lugar y descripcion son opcionales (nullable en SQL)
+ lugar String?
+ descripcion String?
+ // @default(now()) → Fecha de creación del registro
+ creadoEn DateTime @default(now()) @map("creado_en")
+ // @updatedAt → Se actualiza automáticamente cada vez que se modifica el registro
+ actualizadoEn DateTime @updatedAt @map("actualizado_en")
+ // Clave foránea: referencia al id del Usuario que creó la sesión
+ creadorId Int @map("creador_id")
+ // Relación: la sesión pertenece a un usuario (el creador)
+ // @relation define cómo se unen las tablas
+ // fields: columna en esta tabla que guarda el FK
+ // references: columna en la tabla relacionada
+ creador Usuario @relation(fields: [creadorId], references: [id])
+ @@map("sesiones")
 }

@@ -134,13 +134,13 @@ Sigue este flujo para demostrar que todo funciona correctamente.
 
 ### Paso 1 — Registrar 3 usuarios (uno por grupo)
 
-Con Thunder Client o el Swagger en `http://localhost:3000/api-docs`:
+Con Thunder Client o el Swagger en ``:
 
 **POST** `http://localhost:3000/auth/register`
 
 ```json
 { "nombre": "Ana Torres",    "email": "ana@estudio.bo",    "password": "grupo1pass" }
-{ "nombre": "Carlos Mendez", "email": "carlos@estudio.bo", "password": "grupo2pass" }
+{ "nombre": "Carlos Mendez", "email": "carlos@estudio.bo", "passwordhttp://localhost:3000/api-docs": "grupo2pass" }
 { "nombre": "Sofia Vargas",  "email": "sofia@estudio.bo",  "password": "grupo3pass" }
 ```
 
